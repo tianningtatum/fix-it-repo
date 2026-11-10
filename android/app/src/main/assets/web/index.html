@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#14161a">
+<title>Fix-It Crew</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="hz"></div>
+
+<section id="sJoin" hidden>
+  <div class="wrap">
+    <div class="brand"><span class="prog">Team repair game</span><h1>Fix-It Crew</h1><p>One of you sees a broken machine. Everyone else holds a piece of the manual. Talk it through.</p></div>
+    <form id="joinForm" autocomplete="off">
+      <div class="field"><span class="label">Your program</span><div class="programs" id="jPrograms"></div></div>
+      <div class="field"><label class="label" for="jName">Your name</label><input id="jName" maxlength="16" placeholder="e.g. Ana"></div>
+      <div class="field"><label class="label" for="jTeam">Team code (same for everyone on your team)</label><input id="jTeam" class="code" maxlength="12" autocapitalize="characters" spellcheck="false" placeholder="e.g. TEAM3"></div>
+      <div class="err" id="jErr" role="alert"></div>
+      <button class="btn" type="submit" id="jBtn">Join team</button>
+    </form>
+    <details class="how" open>
+      <summary>How to play</summary>
+      <ol>
+        <li>Everyone on your team picks the same program and types the <b>same team code</b>.</li>
+        <li>Each round, one phone is the <b>operator</b> and sees a broken machine. The others each hold <b>different pages</b> of the manual.</li>
+        <li>The operator describes what they see. Whoever has the right page says what to do.</li>
+        <li>The operator changes every round. Your team has 3 spare parts. A failed round uses one.</li>
+      </ol>
+    </details>
+    <div style="margin-top:18px"><a class="btn ghost" href="/host" id="hostLink" hidden>Back to the host board</a></div>
+  </div>
+</section>
+
+<section id="sLobby" hidden>
+  <div class="wrap">
+    <div class="teamhead"><div style="min-width:0"><span class="label" id="lProg"></span><h2 id="lTeam"></h2></div><span class="tag" id="lCount"></span></div>
+    <p class="note" id="lTag" style="margin-top:0"></p>
+    <div class="roster" id="lRoster"></div>
+    <div class="btns">
+      <button class="btn" id="lStart">Start game</button>
+      <p class="note" id="lNote" style="margin:0"></p>
+      <button class="btn ghost" id="lLeave">Leave team</button>
+    </div>
+  </div>
+</section>
+
+<section id="sPlay" hidden>
+  <div class="wrap" style="padding-top:4px">
+    <div class="ghead"><span class="ttl" id="pTitle"></span><span class="chip" id="pStn"></span><button class="icon" id="pMute">Sound on</button><button class="icon" id="pEnd">End</button></div>
+    <div class="status"><div class="rnd" id="pRound"></div><div><span class="label">Spare parts</span><div class="lives" id="pLives"></div></div></div>
+    <div class="mates" id="pMates"></div>
+    <div id="pBody"></div>
+  </div>
+</section>
+
+<section id="sOver" hidden>
+  <div class="wrap">
+    <div class="rhead"><span class="label" id="oKick"></span><h1 id="oTitle"></h1><p class="note" id="oSub"></p></div>
+    <div class="cert" id="cert"></div>
+    <div class="btns">
+      <button class="btn" id="oCopy">Copy log for submission</button>
+      <textarea class="log" id="oLog" readonly hidden></textarea>
+      <button class="btn ghost" id="oAgain">Play again with this team</button>
+      <button class="btn ghost" id="oLeave">Leave team</button>
+    </div>
+  </div>
+</section>
+
+<div class="toast" id="toast"></div>
+<div class="conn" id="conn" hidden>Reconnecting to the host phone…</div>
+
+<script src="themes.js"></script>
+<script src="core.js"></script>
+<script src="player.js"></script>
+</body>
+</html>

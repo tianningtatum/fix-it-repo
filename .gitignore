@@ -1,0 +1,11 @@
+build/
+.gradle/
+android/.gradle/
+android/app/build/
+android/build/
+local.properties
+*.iml
+.idea/
+shots/
+server.log
+play.py

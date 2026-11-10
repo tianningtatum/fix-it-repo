@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#14161a">
+<title>Fix-It Crew Host</title>
+<link rel="stylesheet" href="style.css">
+<style>
+/* Host board: join card (QR + address) first, then live team cards, then teacher tools */
+.joincard{background:var(--plate);border:2px solid var(--accent);border-radius:14px;padding:16px;display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:center;margin-top:14px}
+.qr{background:#fff;border-radius:10px;padding:8px;width:168px;height:168px;display:flex;align-items:center;justify-content:center}
+.qr img,.qr svg{width:152px;height:152px;image-rendering:pixelated}
+.addr{font-family:var(--mono);font-weight:700;font-size:clamp(18px,5vw,26px);overflow-wrap:anywhere;-webkit-user-select:text;user-select:text}
+.alt{font-family:var(--mono);font-size:13px;color:var(--dim);overflow-wrap:anywhere}
+.joincard p{margin:6px 0 0;color:var(--dim);font-size:14px;line-height:1.45}
+.noip{color:#ff8a80;font-weight:600}
+.sec2{display:flex;justify-content:space-between;align-items:baseline;margin:22px 0 10px;gap:10px}
+.sec2 h2{font-size:24px;text-transform:uppercase}
+.teams{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr));gap:12px}
+.team{background:var(--plate);border:1px solid var(--edge);border-left:6px solid var(--tc);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.team .th{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}
+.team h3{font-size:24px;text-transform:uppercase;min-width:0;overflow-wrap:anywhere}
+.team .pg{font-size:12px;color:var(--dim)}
+.badge{font-family:var(--display);font-size:12px;letter-spacing:.1em;text-transform:uppercase;padding:4px 8px;border-radius:5px;background:var(--plate2);color:var(--dim);white-space:nowrap}
+.badge.run{background:rgba(255,194,26,.16);color:var(--accent)}
+.badge.ok{background:rgba(53,198,111,.2);color:var(--go)}
+.badge.bad{background:rgba(229,57,44,.2);color:#ff8a80}
+.nums{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.nums div{background:var(--plate2);border-radius:8px;padding:6px 8px}
+.nums b{display:block;font-family:var(--mono);font-size:20px}
+.nums span{font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.08em}
+.ppl{display:flex;flex-wrap:wrap;gap:6px}
+.tfoot{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+.mini{background:transparent;border:1px solid var(--edge);border-radius:6px;padding:6px 10px;font-size:13px;color:var(--dim)}
+.mini.arm{border-color:var(--stop);color:#ff8a80}
+.empty{border:2px dashed var(--edge);border-radius:12px;padding:28px 16px;text-align:center;color:var(--dim)}
+.tcard{background:var(--plate);border:1px solid var(--edge);border-radius:12px;padding:14px 16px;margin:12px 0}
+.tcard h3{font-size:20px;text-transform:uppercase;margin-bottom:8px;color:var(--accent)}
+.tcard ul,.tcard ol{margin:0;padding-left:20px;line-height:1.55;font-size:14px}
+.tcard li{margin-bottom:6px}
+.tcard li b{color:var(--accent2);font-weight:600}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.tabs button{border:1px solid var(--edge);background:var(--plate2);border-radius:999px;padding:6px 12px;font-size:13px}
+.tabs button.sel{background:var(--accent);color:var(--accentInk);border-color:var(--accent)}
+.verdict{border-radius:10px;padding:12px;margin-top:10px;font-weight:600}
+.verdict.ok{background:rgba(53,198,111,.18);color:#8fe3b0}.verdict.bad{background:rgba(229,57,44,.18);color:#ff9a90}
+@media (max-width:440px){.joincard{grid-template-columns:1fr;justify-items:center;text-align:center}}
+</style>
+</head>
+<body>
+<div class="hz"></div>
+<div class="wrap" style="max-width:980px">
+  <div class="brand" style="padding-bottom:0"><span class="prog">Host phone</span><h1>Fix-It Crew</h1></div>
+
+  <div class="joincard">
+    <div class="qr" id="qr"></div>
+    <div style="min-width:0">
+      <span class="label">Players scan this or type the address in Safari or Chrome</span>
+      <div class="addr" id="addr">Looking for your network…</div>
+      <div class="alt" id="alt"></div>
+      <p>Everyone must be on this phone's <b>hotspot</b> or the <b>same Wi-Fi</b>. No internet needed. Keep this app open.</p>
+    </div>
+  </div>
+  <div class="btns" style="margin-top:12px"><a class="btn ghost" href="/" id="playHere">Play on this phone too</a></div>
+
+  <div class="sec2"><h2>Teams</h2><span class="label" id="tCount"></span></div>
+  <div class="teams" id="teams"><div class="empty">No teams yet. Players join by scanning the code above.</div></div>
+
+  <div class="sec2"><h2>Teacher tools</h2></div>
+  <div class="tcard">
+    <h3>Check a student's log</h3>
+    <p class="note" style="margin-top:0">Paste the log a student sent you.</p>
+    <textarea class="log" id="tLog" placeholder="Paste the copied log here"></textarea>
+    <div style="margin-top:10px"><button class="btn" id="tVerify">Check</button></div>
+    <div id="tResult"></div>
+  </div>
+  <div class="tcard">
+    <h3>What it trains (keep this to yourself until the debrief)</h3>
+    <ul>
+      <li><b>Operator describing what they see:</b> precise technical language under time pressure.</li>
+      <li><b>Manual holders giving instructions:</b> being clear, checking the operator understood, and saying "that's not on my page."</li>
+      <li><b>Split manual:</b> knowing who holds which information and asking for help fast.</li>
+      <li><b>Rotating operator:</b> every member has to lead at least once; the team has to support quieter members.</li>
+      <li><b>Mistakes:</b> trust vs. verify. Acting before the instruction is clear costs a strike.</li>
+    </ul>
+  </div>
+  <div class="tcard">
+    <h3>Debrief questions</h3>
+    <div class="tabs" id="dTabs"></div>
+    <ol id="dList"></ol>
+  </div>
+  <div class="tcard">
+    <h3>Technopreneurship link</h3>
+    <ul>
+      <li><b>The split manual</b> is a cross-functional team: nobody has the whole picture.</li>
+      <li><b>The operator</b> is the founder facing the market, acting on what mentors and data say without seeing it all.</li>
+      <li><b>The rotating lead</b> is shared leadership: a startup where only one person can lead is fragile.</li>
+    </ul>
+  </div>
+</div>
+<div class="conn" id="conn" hidden>Server stopped. Reopen the app.</div>
+
+<script src="themes.js"></script>
+<script src="core.js"></script>
+<script src="qrcode.js"></script>
+<script>
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
+  var TH = FIXTHEMES, ORDER = ['ce', 'ee', 'cpe', 'me'];
+  var arm = {}, last = null, shownUrl = '';
+
+  function info() {
+    fetch('/api/info').then(function (r) { return r.json(); }).then(function (d) {
+      var ips = d.ips || [];
+      if (!ips.length) {
+        $('addr').innerHTML = '<span class="noip">Turn on your hotspot or connect to Wi-Fi.</span>'; $('alt').textContent = ''; $('qr').innerHTML = ''; shownUrl = '';
+        return;
+      }
+      var urls = ips.map(function (ip) { return 'http://' + ip + ':' + d.port; });
+      $('addr').textContent = urls[0].replace('http://', '');
+      $('alt').textContent = urls.length > 1 ? 'Other addresses: ' + urls.slice(1).map(function (u) { return u.replace('http://', ''); }).join(' · ') : '';
+      if (urls[0] !== shownUrl) {
+        shownUrl = urls[0];
+        try { var q = qrcode(0, 'M'); q.addData(urls[0]); q.make(); $('qr').innerHTML = q.createSvgTag(4, 0); } catch (e) { $('qr').textContent = ''; }
+      }
+    }).catch(function () { });
+  }
+  info(); setInterval(info, 5000);
+
+  function teamCard(r) {
+    var T = TH[r.program], badge;
+    if (r.state === 'lobby') badge = '<span class="badge">Lobby</span>';
+    else if (r.state === 'over') badge = '<span class="badge ' + (r.ended === 'out' ? 'bad' : 'ok') + '">' + (r.ended === 'out' ? 'Out of parts' : 'Ended') + '</span>';
+    else badge = '<span class="badge run">' + (r.phase === 'repair' ? 'Repairing' : r.phase === 'result' ? (r.result === 'ok' ? 'Fixed!' : 'Failed') : 'Briefing') + '</span>';
+    var op = r.players.filter(function (p) { return p.station === r.operator; })[0];
+    var ppl = r.players.map(function (p) {
+      return '<span class="mate' + (p.online ? '' : ' off') + (r.state === 'playing' && p.station === r.operator ? ' op' : '') + '"><i></i>' + (p.station + 1) + ' · ' + esc(p.name) + '</span>';
+    }).join('');
+    var nums = r.state === 'lobby' ? '' : '<div class="nums"><div><b>' + r.fixed + '</b><span>Fixed</span></div><div><b>' + r.round + '</b><span>Round</span></div><div><b>' + r.lives + '/3</b><span>Parts</span></div></div>';
+    var opLine = r.state === 'playing' ? '<div class="note" style="margin:0">Operator: <b>' + esc(op ? op.name : '—') + '</b>' + (op && !op.online ? ' (offline)' : '') + '</div>' : '';
+    var btns = '';
+    if (r.state === 'playing') btns += '<button class="mini' + (arm[r.key + 'skip'] ? ' arm' : '') + '" data-a="skip" data-r="' + esc(r.key) + '">' + (arm[r.key + 'skip'] ? 'Tap again to skip' : 'Skip operator') + '</button>';
+    btns += '<button class="mini' + (arm[r.key + 'close'] ? ' arm' : '') + '" data-a="close" data-r="' + esc(r.key) + '">' + (arm[r.key + 'close'] ? 'Tap again to close' : 'Close team') + '</button>';
+    return '<div class="team" style="--tc:' + T.colors.accent + '"><div class="th"><div style="min-width:0"><h3>' + esc(r.key) + '</h3><span class="pg">' + esc(T.title) + ' · ' + esc(T.program) + '</span></div>' + badge + '</div>' +
+      nums + opLine + '<div class="ppl">' + ppl + '</div><div class="tfoot">' + btns + '</div></div>';
+  }
+  function render() {
+    if (!last) return;
+    $('tCount').textContent = last.rooms.length ? last.rooms.length + ' team' + (last.rooms.length > 1 ? 's' : '') : '';
+    $('teams').innerHTML = last.rooms.length ? last.rooms.map(teamCard).join('') : '<div class="empty">No teams yet. Players join by scanning the code above.</div>';
+  }
+  $('teams').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-a]'); if (!b) return;
+    var k = b.dataset.r + b.dataset.a;
+    if (arm[k]) {
+      delete arm[k];
+      fetch('/host/act', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ room: b.dataset.r, type: b.dataset.a }) });
+    } else { arm[k] = 1; setTimeout(function () { delete arm[k]; render(); }, 3000); }
+    render();
+  });
+
+  var es = new EventSource('/host/events');
+  es.onmessage = function (e) { $('conn').hidden = true; try { last = JSON.parse(e.data); } catch (err) { return; } render(); };
+  es.onerror = function () { $('conn').hidden = false; };
+
+  // debrief tabs
+  var cur = 'ce';
+  function renderDebrief() {
+    $('dTabs').innerHTML = ORDER.map(function (p) { return '<button data-p="' + p + '" class="' + (p === cur ? 'sel' : '') + '">' + esc(TH[p].title) + '</button>'; }).join('');
+    $('dList').innerHTML = TH[cur].debrief.map(function (q) { return '<li>' + esc(q) + '</li>'; }).join('');
+  }
+  $('dTabs').addEventListener('click', function (e) { var b = e.target.closest('button[data-p]'); if (!b) return; cur = b.dataset.p; renderDebrief(); });
+  renderDebrief();
+
+  // log check
+  $('tVerify').addEventListener('click', function () {
+    var s = $('tLog').value, out = $('tResult');
+    function m(re) { var r = s.match(re); return r ? r[1].trim() : null; }
+    var f = { title: m(/^\s*([A-Z][A-Z ]+?)\s*·/m), code: m(/Team:\s*([A-Z0-9]+)/), N: m(/Station\s+\d+\s+of\s+(\d+)/), s: m(/Station\s+(\d+)\s+of/),
+      runNo: m(/Game\s+(\d+)/), fixed: m(/Machines fixed:\s*(\d+)/), attempts: m(/Attempts:\s*(\d+)/), lives: m(/Spare parts left:\s*(\d+)/), status: m(/Status:\s*([a-z ]+)/) };
+    var code = m(/Check:\s*([A-Z0-9]+)/);
+    if (Object.keys(f).some(function (k) { return f[k] === null; }) || !code) { out.innerHTML = '<div class="verdict bad">This doesn\'t look like a complete log. Ask the student to tap "Copy log" again and paste all of it.</div>'; return; }
+    ['N', 's', 'runNo', 'fixed', 'attempts', 'lives'].forEach(function (k) { f[k] = +f[k]; });
+    var ok = FIX.checkCode(f) === code;
+    out.innerHTML = ok ? '<div class="verdict ok">✓ Genuine. ' + esc(f.title) + ' · team ' + esc(f.code) + ' · ' + f.fixed + ' machines fixed (' + esc(f.status) + ').</div>'
+      : '<div class="verdict bad">✗ The check code doesn\'t match. Something in this log was changed.</div>';
+  });
+})();
+</script>
+</body>
+</html>

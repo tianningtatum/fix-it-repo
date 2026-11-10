@@ -1,0 +1,49 @@
+name: Build APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
+      - name: Build the APK
+        working-directory: android
+        env:
+          VERSION_CODE: ${{ github.run_number }}
+        run: gradle assembleRelease --no-daemon --stacktrace
+
+      - name: Name the file
+        run: cp android/app/build/outputs/apk/release/app-release.apk FixItCrew.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: FixItCrew-apk
+          path: FixItCrew.apk
+
+      - name: Publish a release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.${{ github.run_number }}
+          name: Fix-It Crew v1.0.${{ github.run_number }}
+          make_latest: true
+          files: FixItCrew.apk
+          body: |
+            Download **FixItCrew.apk** below and install it on the Android phone that will host the game.
+            Players don't install anything: they scan the QR code on the host phone and play in Safari or Chrome.
