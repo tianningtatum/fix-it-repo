@@ -44,6 +44,15 @@
 .tabs button{border:1px solid var(--edge);background:var(--plate2);border-radius:999px;padding:6px 12px;font-size:13px}
 .tabs button.sel{background:var(--accent);color:var(--accentInk);border-color:var(--accent)}
 .verdict{border-radius:10px;padding:12px;margin-top:10px;font-weight:600}
+.stepper{display:grid;grid-template-columns:52px 1fr 52px;gap:8px}
+.stepper button{border:1px solid var(--edge);background:var(--plate2);border-radius:10px;font-size:24px;font-weight:700;min-height:48px}
+.stepper output{display:flex;align-items:center;justify-content:center;background:var(--bg);border-radius:10px;font-family:var(--mono);font-size:24px;font-weight:700}
+table.board{border-collapse:collapse;width:100%;font-size:14px;font-variant-numeric:tabular-nums}
+table.board td:nth-child(3){white-space:normal;font-size:12px;color:var(--dim)}
+table.board th,table.board td{padding:8px 6px;border-bottom:1px solid var(--edge);text-align:left;white-space:nowrap}
+table.board th{font-family:var(--display);font-weight:400;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim)}
+table.board td.pts{font-family:var(--mono);font-weight:700;color:var(--accent)}
+table.board tr.wait td{color:var(--dim)}
 .verdict.ok{background:rgba(53,198,111,.18);color:#8fe3b0}.verdict.bad{background:rgba(229,57,44,.18);color:#ff9a90}
 @media (max-width:440px){.joincard{grid-template-columns:1fr;justify-items:center;text-align:center}}
 </style>
@@ -63,6 +72,18 @@
     </div>
   </div>
   <div class="btns" style="margin-top:12px"><a class="btn ghost" href="/" id="playHere">Play on this phone too</a></div>
+
+  <div class="sec2"><h2>Race</h2></div>
+  <div class="tcard" style="margin-top:0">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+      <div><span class="label">Goal: machines to fix in one game</span>
+        <div class="stepper" style="max-width:220px;margin-top:6px"><button id="tgMinus" aria-label="Lower goal">−</button><output id="tgN">5</output><button id="tgPlus" aria-label="Raise goal">+</button></div></div>
+      <p class="note" style="max-width:34ch;margin:0">1st team to reach the goal: <b>100</b>. Next 2: <b>95</b>. Next 3: <b>90</b>. Everyone else: <b>80</b>.</p>
+    </div>
+    <div class="tblw" style="margin-top:14px;overflow-x:auto"><table class="board"><thead><tr><th>Place</th><th>Team</th><th>Game</th><th>Finished</th><th>Points</th></tr></thead><tbody id="board"></tbody></table></div>
+    <div class="tfoot" style="margin-top:10px"><button class="mini" id="copyBoard">Copy results</button><button class="mini" id="resetBoard">Reset for next class</button></div>
+    <textarea class="log" id="boardTxt" readonly hidden style="margin-top:10px;min-height:120px"></textarea>
+  </div>
 
   <div class="sec2"><h2>Teams</h2><span class="label" id="tCount"></span></div>
   <div class="teams" id="teams"><div class="empty">No teams yet. Players join by scanning the code above.</div></div>
@@ -147,8 +168,28 @@
     return '<div class="team" style="--tc:' + T.colors.accent + '"><div class="th"><div style="min-width:0"><h3>' + esc(r.key) + '</h3><span class="pg">' + esc(T.title) + ' · ' + esc(T.program) + '</span></div>' + badge + '</div>' +
       nums + opLine + '<div class="ppl">' + ppl + '</div><div class="tfoot">' + btns + '</div></div>';
   }
+  function points(rank) { return rank === 1 ? 100 : rank <= 3 ? 95 : rank <= 6 ? 90 : 80; }
+  function ordinal(n) { var s = ['th', 'st', 'nd', 'rd'], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); }
+  function clock(ms) { var d = new Date(ms); return [d.getHours(), d.getMinutes(), d.getSeconds()].map(function (x) { return String(x).padStart(2, '0'); }).join(':'); }
+  function boardRows() {
+    var fin = last.finishers || [], done = {};
+    var rows = fin.map(function (f) { done[f.team] = 1; return { place: ordinal(f.rank), team: f.team, game: TH[f.program].title, at: clock(f.at), pts: points(f.rank), wait: false, players: f.players }; });
+    last.rooms.forEach(function (r) {
+      if (done[r.key]) return;
+      rows.push({ place: '—', team: r.key, game: TH[r.program].title, at: r.state === 'playing' ? 'playing · ' + r.fixed + '/' + r.target : 'not finished', pts: 80, wait: true, players: r.players.map(function (p) { return p.name; }) });
+    });
+    return rows;
+  }
+  function renderBoard() {
+    $('tgN').textContent = last.target;
+    var rows = boardRows();
+    $('board').innerHTML = rows.length ? rows.map(function (x) {
+      return '<tr class="' + (x.wait ? 'wait' : '') + '"><td>' + x.place + '</td><td><b>' + esc(x.team) + '</b></td><td>' + esc(x.game) + '</td><td>' + esc(x.at) + '</td><td class="pts">' + x.pts + (x.wait ? '*' : '') + '</td></tr>';
+    }).join('') : '<tr class="wait"><td colspan="5">No teams yet.</td></tr>';
+  }
   function render() {
     if (!last) return;
+    renderBoard();
     $('tCount').textContent = last.rooms.length ? last.rooms.length + ' team' + (last.rooms.length > 1 ? 's' : '') : '';
     $('teams').innerHTML = last.rooms.length ? last.rooms.map(teamCard).join('') : '<div class="empty">No teams yet. Players join by scanning the code above.</div>';
   }
@@ -166,6 +207,26 @@
   es.onmessage = function (e) { $('conn').hidden = true; try { last = JSON.parse(e.data); } catch (err) { return; } render(); };
   es.onerror = function () { $('conn').hidden = false; };
 
+  function hostAct(body) { return fetch('/host/act', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); }
+  $('tgMinus').addEventListener('click', function () { if (last) hostAct({ type: 'target', n: last.target - 1 }); });
+  $('tgPlus').addEventListener('click', function () { if (last) hostAct({ type: 'target', n: last.target + 1 }); });
+  var resetArm = 0;
+  $('resetBoard').addEventListener('click', function () {
+    if (Date.now() - resetArm < 3000) { hostAct({ type: 'resetBoard' }); this.textContent = 'Reset for next class'; this.classList.remove('arm'); resetArm = 0; return; }
+    resetArm = Date.now(); this.textContent = 'Tap again to clear the results'; this.classList.add('arm');
+    var self = this; setTimeout(function () { self.textContent = 'Reset for next class'; self.classList.remove('arm'); }, 3000);
+  });
+  $('copyBoard').addEventListener('click', function () {
+    if (!last) return;
+    var d = new Date(), txt = 'Fix-It Crew results · ' + d.toDateString() + ' · goal ' + last.target + ' machines\n' +
+      boardRows().map(function (x) { return x.place + '\t' + x.team + '\t' + x.game + '\t' + x.at + '\t' + x.pts + (x.wait ? ' (not finished)' : '') + '\t' + x.players.join(', '); }).join('\n');
+    var box = $('boardTxt'), btn = this;
+    box.value = txt; box.hidden = false;
+    function fallback() { box.focus(); box.select(); btn.textContent = 'Selected — copy it'; }
+    try { navigator.clipboard.writeText(txt).then(function () { btn.textContent = 'Copied ✓'; }, fallback); } catch (e) { fallback(); }
+    setTimeout(function () { btn.textContent = 'Copy results'; }, 3000);
+  });
+
   // debrief tabs
   var cur = 'ce';
   function renderDebrief() {
@@ -180,7 +241,7 @@
     var s = $('tLog').value, out = $('tResult');
     function m(re) { var r = s.match(re); return r ? r[1].trim() : null; }
     var f = { title: m(/^\s*([A-Z][A-Z ]+?)\s*·/m), code: m(/Team:\s*([A-Z0-9]+)/), N: m(/Station\s+\d+\s+of\s+(\d+)/), s: m(/Station\s+(\d+)\s+of/),
-      runNo: m(/Game\s+(\d+)/), fixed: m(/Machines fixed:\s*(\d+)/), attempts: m(/Attempts:\s*(\d+)/), lives: m(/Spare parts left:\s*(\d+)/), status: m(/Status:\s*([a-z ]+)/) };
+      runNo: m(/Game\s+(\d+)/), fixed: m(/Machines fixed:\s*(\d+)/), attempts: m(/Attempts:\s*(\d+)/), lives: m(/Spare parts left:\s*(\d+)/), status: m(/Status:\s*([a-z0-9 #]+)/) };
     var code = m(/Check:\s*([A-Z0-9]+)/);
     if (Object.keys(f).some(function (k) { return f[k] === null; }) || !code) { out.innerHTML = '<div class="verdict bad">This doesn\'t look like a complete log. Ask the student to tap "Copy log" again and paste all of it.</div>'; return; }
     ['N', 's', 'runNo', 'fixed', 'attempts', 'lives'].forEach(function (k) { f[k] = +f[k]; });

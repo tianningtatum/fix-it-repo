@@ -52,6 +52,8 @@ public final class GameServer {
     private final Random random = new Random();
     private volatile boolean running;
     private volatile boolean hostDirty = true;
+    private int target = 5;
+    private final List<Map<String, Object>> finishers = new ArrayList<Map<String, Object>>();
     private ServerSocket serverSocket;
     private ExecutorService pool;
     private Thread acceptThread, tickThread;
@@ -81,6 +83,7 @@ public final class GameServer {
         int faults, modules;
         final Set<Integer> solved = new LinkedHashSet<Integer>();
         String result, why, ended;
+        int rank; long finishedAt;
         long emptySince;
         boolean dirty = true;
 
@@ -253,14 +256,38 @@ public final class GameServer {
         else if ("fail".equals(r.result)) r.lives--;
         r.k++;
         resetRound(r);
-        if (r.lives <= 0) { r.state = "over"; r.ended = "out"; }
+        if (r.fixed >= target) {
+            r.state = "over"; r.ended = "target";
+            if (r.rank == 0) {
+                r.finishedAt = System.currentTimeMillis();
+                r.rank = finishers.size() + 1;
+                Map<String, Object> f = new LinkedHashMap<String, Object>();
+                f.put("rank", r.rank); f.put("team", r.key); f.put("program", r.program); f.put("at", r.finishedAt);
+                f.put("fixed", r.fixed); f.put("target", target);
+                List<Object> names = new ArrayList<Object>(); for (Player p : r.players) names.add(p.name);
+                f.put("players", names);
+                finishers.add(f);
+            }
+        } else if (r.lives <= 0) { r.state = "over"; r.ended = "out"; }
     }
 
     private Map<String, Object> hostAct(Map<String, Object> b) {
         synchronized (lock) {
+            String type = clean(b.get("type"), 16);
+            if ("target".equals(type)) {
+                target = Math.max(1, Math.min(20, num(b.get("n"), target)));
+                for (Room x : rooms.values()) x.dirty = true;
+                hostDirty = true;
+                Map<String, Object> out = new LinkedHashMap<String, Object>(); out.put("ok", true); return out;
+            }
+            if ("resetBoard".equals(type)) {
+                finishers.clear();
+                for (Room x : rooms.values()) { x.rank = 0; x.finishedAt = 0; x.dirty = true; }
+                hostDirty = true;
+                Map<String, Object> out = new LinkedHashMap<String, Object>(); out.put("ok", true); return out;
+            }
             Room r = rooms.get(clean(b.get("room"), 40));
             if (r == null) return err("gone");
-            String type = clean(b.get("type"), 16);
             if ("skip".equals(type) && "playing".equals(r.state)) {
                 r.result = "skip"; advance(r);
             } else if ("close".equals(type)) {
@@ -317,6 +344,7 @@ public final class GameServer {
         m.put("phase", r.phase); m.put("repairStart", r.repairStart); m.put("timeMs", r.timeMs); m.put("faults", r.faults);
         m.put("solved", new ArrayList<Integer>(r.solved)); m.put("modules", r.modules); m.put("result", r.result); m.put("why", r.why);
         m.put("ended", r.ended); m.put("operator", r.operator());
+        m.put("target", target); m.put("rank", r.rank); m.put("finishedAt", r.finishedAt);
         List<Object> ps = new ArrayList<Object>();
         for (Player p : r.players) {
             Map<String, Object> x = new LinkedHashMap<String, Object>();
@@ -340,6 +368,8 @@ public final class GameServer {
         List<Object> rs = new ArrayList<Object>();
         for (Room r : rooms.values()) rs.add(roomView(r));
         m.put("rooms", rs);
+        m.put("target", target);
+        m.put("finishers", new ArrayList<Object>(finishers));
         return m;
     }
     private static Map<String, Object> err(String msg) {

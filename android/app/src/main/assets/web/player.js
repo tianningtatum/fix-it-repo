@@ -23,6 +23,9 @@
   var lastPhaseKey = '';
 
   function now() { return Date.now() + offset; }
+  function points(rank) { return rank === 1 ? 100 : rank <= 3 ? 95 : rank <= 6 ? 90 : 80; }
+  function ordinal(n) { var s = ['th', 'st', 'nd', 'rd'], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); }
+  function clock(ms) { var d = new Date(ms); return [d.getHours(), d.getMinutes(), d.getSeconds()].map(function (x) { return String(x).padStart(2, '0'); }).join(':'); }
   function show(id) {
     if (screen === id) return;
     screen = id;
@@ -162,7 +165,7 @@
     }).join('');
     $('lStart').disabled = online < 2;
     $('lNote').textContent = online < 2 ? 'Waiting for teammates. They join with team code ' + r.key + ' on the same Wi-Fi or hotspot.'
-      : 'Best with 3 to 6. Start when everyone is in. Anyone on the team can press Start.';
+      : 'Goal: fix ' + r.target + ' machines in one game. Best with 3 to 6. Start when everyone is in; anyone on the team can press Start.';
   }
   $('lStart').addEventListener('click', function () { audioInit(); wake(); act('start'); });
   $('lLeave').addEventListener('click', function () { act('leave'); toJoin(''); });
@@ -193,7 +196,7 @@
     var opName = (r.players.filter(function (p) { return p.station === opIdx; })[0] || {}).name || ('Station ' + (opIdx + 1));
     $('pTitle').textContent = T.title;
     $('pStn').textContent = 'Stn ' + (me.station + 1) + '/' + r.n;
-    $('pRound').innerHTML = '<small>' + esc(T.machine) + '</small>Round ' + r.round;
+    $('pRound').innerHTML = '<small>Goal: fix ' + r.target + ' · fixed ' + r.fixed + ' so far</small>Round ' + r.round;
     var lv = ''; for (var i = 0; i < X.LIVES; i++) lv += '<i class="' + (i < r.lives ? '' : 'lost') + '"></i>';
     $('pLives').innerHTML = lv;
     $('pMates').innerHTML = r.players.map(function (p) {
@@ -371,7 +374,7 @@
   }
 
   // ------------------------------------------------------------ report
-  function statusText(r) { return r.ended === 'out' ? 'out of spare parts' : 'ended'; }
+  function statusText(r) { return r.ended === 'target' ? 'finished #' + r.rank : r.ended === 'out' ? 'out of spare parts' : 'ended'; }
   function fields() {
     var r = view.room;
     return { title: T.title, code: r.key, N: r.n, s: view.me.station + 1, runNo: r.seed, fixed: r.fixed, attempts: r.k, lives: r.lives, status: statusText(r) };
@@ -383,22 +386,31 @@
       'Machines fixed: ' + f.fixed,
       'Status: ' + f.status,
       'Attempts: ' + f.attempts + ' · Spare parts left: ' + f.lives,
+      (r.rank ? 'Finish: ' + ordinal(r.rank) + ' team at ' + clock(r.finishedAt) + ' · ' + points(r.rank) + ' points\n' : '') +
       'Rounds: ' + (r.hist.map(function (h) { return 'R' + h.r + '/S' + h.op + (h.res === 'ok' ? '✓' : h.res === 'skip' ? '–' : '✗'); }).join(' ') || 'none'),
       'Check: ' + X.checkCode(f)].join('\n');
   }
   function renderOver() {
     var r = view.room, f = fields();
     show('sOver');
-    $('oKick').textContent = r.ended === 'out' ? 'Out of spare parts' : 'Game ended';
-    $('oTitle').textContent = 'Machines fixed: ' + r.fixed;
-    $('oSub').textContent = 'Everyone on your team sees this same report. Screenshot it or copy the log.';
+    if (r.ended === 'target') {
+      $('oKick').textContent = 'Goal reached · ' + r.fixed + ' machines fixed';
+      $('oTitle').textContent = ordinal(r.rank) + ' team to finish';
+      $('oSub').textContent = points(r.rank) + ' points. Screenshot this report or copy the log and send it to your teacher.';
+    } else {
+      $('oKick').textContent = r.ended === 'out' ? 'Out of spare parts' : 'Game ended';
+      $('oTitle').textContent = 'Machines fixed: ' + r.fixed;
+      $('oSub').textContent = r.rank ? 'Your team already finished ' + ordinal(r.rank) + '.' : 'You need ' + r.target + ' in one game. Tap "Play again with this team" to try again; the clock keeps running.';
+    }
     var rows = r.hist.map(function (h) {
       var nm = (r.players.filter(function (p) { return p.station === h.op - 1; })[0] || {}).name || ('Station ' + h.op);
       return '<dt>Round ' + h.r + ' · ' + esc(nm) + '</dt><dd>' + (h.res === 'ok' ? 'fixed' : h.res === 'skip' ? 'skipped' : 'failed') + '</dd>';
     }).join('');
     $('cert').innerHTML =
       '<div class="ct"><b>' + esc(T.title) + '</b><span>' + esc(T.program) + '</span></div>' +
-      '<div class="hero"><b>' + r.fixed + '</b><span>Machines fixed<small>' + (r.ended === 'out' ? 'Stopped at round ' + r.round + ', out of spare parts' : 'Ended at round ' + r.round) + '</small></span></div>' +
+      (r.ended === 'target'
+        ? '<div class="hero"><b>' + ordinal(r.rank) + '</b><span>Team to finish<small>Fixed ' + r.fixed + ' machines · finished at ' + clock(r.finishedAt) + ' · ' + points(r.rank) + ' points</small></span></div>'
+        : '<div class="hero"><b>' + r.fixed + '</b><span>Machines fixed<small>' + (r.ended === 'out' ? 'Stopped at round ' + r.round + ', out of spare parts' : 'Ended at round ' + r.round) + '</small></span></div>') +
       '<dl><dt>Team</dt><dd>' + esc(r.key) + ' · ' + r.n + ' players</dd>' +
       '<dt>Crew</dt><dd>' + esc(r.players.map(function (p) { return p.name; }).join(', ')) + '</dd>' +
       '<dt>Game ID</dt><dd>' + r.seed + '</dd>' +
