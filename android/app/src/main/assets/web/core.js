@@ -249,7 +249,40 @@ var FIX = (function () {
     return out;
   }
 
-  return { LIVES: LIVES, MAX_FAULTS: MAX_FAULTS, TYPES: TYPES, COLORS: COLORS, buildRound: buildRound, roundSpec: roundSpec,
+  // ------------------------------------------------ teacher: check and rank pasted logs
+  function points(rank) { return rank === 1 ? 100 : rank <= 3 ? 95 : rank <= 6 ? 90 : 80; }
+  function parseLog(t) {
+    function m(re) { var r = t.match(re); return r ? r[1].trim() : null; }
+    var f = { title: m(/^\s*([A-Z][A-Z ]+?)\s*·/m), code: m(/Team:\s*([A-Z0-9]+)/), N: m(/Station\s+\d+\s+of\s+(\d+)/), s: m(/Station\s+(\d+)\s+of/),
+      runNo: m(/Game\s+(\d+)/), fixed: m(/Machines fixed:\s*(\d+)/), attempts: m(/Attempts:\s*(\d+)/), lives: m(/Spare parts left:\s*(\d+)/), status: m(/Status:\s*([a-z0-9 #]+)/) };
+    var code = m(/Check:\s*([A-Z0-9]+)/), players = m(/Players:\s*(.+)$/m);
+    if (Object.keys(f).some(function (k) { return f[k] === null; }) || !code) return { ok: false, why: 'incomplete', team: f.code };
+    ['N', 's', 'runNo', 'fixed', 'attempts', 'lives'].forEach(function (k) { f[k] = +f[k]; });
+    var ok = checkCode(f) === code, race = f.status.match(/in (\d+)s/);
+    return { ok: ok, why: ok ? '' : 'edited', f: f, team: f.code, players: players || '', finished: /^finished/.test(f.status), raceSec: race ? +race[1] : null };
+  }
+  function rankLogs(text) {
+    var starts = [], re = /^[ \t]*[A-Z][A-Z ]+ · [^\n]*$/gm, x;
+    while ((x = re.exec(text))) starts.push(x.index);
+    var blocks = starts.map(function (st, i) { return text.slice(st, i + 1 < starts.length ? starts[i + 1] : text.length); });
+    var teams = {}, problems = [], checked = 0;
+    blocks.forEach(function (b) {
+      var L = parseLog(b);
+      if (!L.ok) { problems.push({ team: L.team || '?', why: L.why }); return; }
+      checked++;
+      var who = L.players.split(',').map(function (n) { return n.trim().toLowerCase(); }).sort().join(',');
+      var key = L.f.title + '|' + L.f.code + '|' + who, cur = teams[key];
+      var better = !cur || (L.finished && (!cur.finished || L.raceSec < cur.raceSec)) || (!L.finished && !cur.finished && L.f.fixed > cur.fixed);
+      if (better) teams[key] = { title: L.f.title, team: L.f.code, players: L.players, finished: L.finished, raceSec: L.raceSec, fixed: L.f.fixed, game: L.f.runNo };
+    });
+    var list = Object.keys(teams).map(function (k) { return teams[k]; });
+    list.sort(function (a, b) { if (a.finished !== b.finished) return a.finished ? -1 : 1; if (a.finished) return a.raceSec - b.raceSec; return b.fixed - a.fixed; });
+    var place = 0;
+    list.forEach(function (t) { if (t.finished) { place++; t.place = place; t.points = points(place); } else { t.place = null; t.points = 80; } });
+    return { rows: list, problems: problems, checked: checked };
+  }
+
+  return { points: points, rankLogs: rankLogs, parseLog: parseLog, LIVES: LIVES, MAX_FAULTS: MAX_FAULTS, TYPES: TYPES, COLORS: COLORS, buildRound: buildRound, roundSpec: roundSpec,
     wiresManual: wiresManual, gaugeTwistText: gaugeTwistText, fingerprint: fingerprint, checkCode: checkCode, hash: hash, wireSolve: wireSolve, facts: facts };
 })();
 if (typeof module !== 'undefined') module.exports = FIX;

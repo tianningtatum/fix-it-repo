@@ -83,7 +83,7 @@ public final class GameServer {
         int faults, modules;
         final Set<Integer> solved = new LinkedHashSet<Integer>();
         String result, why, ended;
-        int rank; long finishedAt;
+        int rank; long finishedAt, raceStart, raceMs;
         long emptySince;
         boolean dirty = true;
 
@@ -212,6 +212,7 @@ public final class GameServer {
                 if (r.players.size() < 2) return err("You need at least 2 phones on the team.");
                 for (int i = 0; i < r.players.size(); i++) r.players.get(i).station = i;
                 r.n = r.players.size(); r.seed = 100000 + random.nextInt(900000);
+                if (r.raceStart == 0) r.raceStart = now; // race clock runs from the team's first Start, through any replays
                 r.k = 0; r.round = 1; r.fixed = 0; r.lives = LIVES; r.hist.clear(); r.ended = null;
                 r.state = "playing"; resetRound(r);
             } else if ("repair".equals(type) && isOp && k == r.k && "brief".equals(r.phase)) {
@@ -260,10 +261,11 @@ public final class GameServer {
             r.state = "over"; r.ended = "target";
             if (r.rank == 0) {
                 r.finishedAt = System.currentTimeMillis();
+                r.raceMs = r.finishedAt - (r.raceStart > 0 ? r.raceStart : r.finishedAt);
                 r.rank = finishers.size() + 1;
                 Map<String, Object> f = new LinkedHashMap<String, Object>();
                 f.put("rank", r.rank); f.put("team", r.key); f.put("program", r.program); f.put("at", r.finishedAt);
-                f.put("fixed", r.fixed); f.put("target", target);
+                f.put("fixed", r.fixed); f.put("target", target); f.put("raceMs", r.raceMs);
                 List<Object> names = new ArrayList<Object>(); for (Player p : r.players) names.add(p.name);
                 f.put("players", names);
                 finishers.add(f);
@@ -282,7 +284,8 @@ public final class GameServer {
             }
             if ("resetBoard".equals(type)) {
                 finishers.clear();
-                for (Room x : rooms.values()) { x.rank = 0; x.finishedAt = 0; x.dirty = true; }
+                long t = System.currentTimeMillis();
+                for (Room x : rooms.values()) { x.rank = 0; x.finishedAt = 0; x.raceMs = 0; x.raceStart = "playing".equals(x.state) ? t : 0; x.dirty = true; }
                 hostDirty = true;
                 Map<String, Object> out = new LinkedHashMap<String, Object>(); out.put("ok", true); return out;
             }
@@ -345,6 +348,7 @@ public final class GameServer {
         m.put("solved", new ArrayList<Integer>(r.solved)); m.put("modules", r.modules); m.put("result", r.result); m.put("why", r.why);
         m.put("ended", r.ended); m.put("operator", r.operator());
         m.put("target", target); m.put("rank", r.rank); m.put("finishedAt", r.finishedAt);
+        m.put("raceStart", r.raceStart); m.put("raceMs", r.raceMs); m.put("teamsOnHost", rooms.size());
         List<Object> ps = new ArrayList<Object>();
         for (Player p : r.players) {
             Map<String, Object> x = new LinkedHashMap<String, Object>();

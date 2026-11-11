@@ -78,9 +78,9 @@ table.board tr.wait td{color:var(--dim)}
     <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
       <div><span class="label">Goal: machines to fix in one game</span>
         <div class="stepper" style="max-width:220px;margin-top:6px"><button id="tgMinus" aria-label="Lower goal">−</button><output id="tgN">5</output><button id="tgPlus" aria-label="Raise goal">+</button></div></div>
-      <p class="note" style="max-width:34ch;margin:0">1st team to reach the goal: <b>100</b>. Next 2: <b>95</b>. Next 3: <b>90</b>. Everyone else: <b>80</b>.</p>
+      <p class="note" style="max-width:36ch;margin:0">Ranked by race time (team's first Start to goal). 1st: <b>100</b>. Next 2: <b>95</b>. Next 3: <b>90</b>. Everyone else: <b>80</b>.</p>
     </div>
-    <div class="tblw" style="margin-top:14px;overflow-x:auto"><table class="board"><thead><tr><th>Place</th><th>Team</th><th>Game</th><th>Finished</th><th>Points</th></tr></thead><tbody id="board"></tbody></table></div>
+    <div class="tblw" style="margin-top:14px;overflow-x:auto"><table class="board"><thead><tr><th>Place</th><th>Team</th><th>Game</th><th>Race time</th><th>Points</th></tr></thead><tbody id="board"></tbody></table></div>
     <div class="tfoot" style="margin-top:10px"><button class="mini" id="copyBoard">Copy results</button><button class="mini" id="resetBoard">Reset for next class</button></div>
     <textarea class="log" id="boardTxt" readonly hidden style="margin-top:10px;min-height:120px"></textarea>
   </div>
@@ -90,10 +90,10 @@ table.board tr.wait td{color:var(--dim)}
 
   <div class="sec2"><h2>Teacher tools</h2></div>
   <div class="tcard">
-    <h3>Check a student's log</h3>
-    <p class="note" style="margin-top:0">Paste the log a student sent you.</p>
-    <textarea class="log" id="tLog" placeholder="Paste the copied log here"></textarea>
-    <div style="margin-top:10px"><button class="btn" id="tVerify">Check</button></div>
+    <h3>Check and rank logs</h3>
+    <p class="note" style="margin-top:0">Use this when each team hosted on its own phone. Paste every log students sent, all at once. Each one is checked, repeats from the same team are merged, and teams are ranked by race time.</p>
+    <textarea class="log" id="tLog" placeholder="Paste the copied logs here"></textarea>
+    <div style="margin-top:10px"><button class="btn" id="tVerify">Check and rank</button></div>
     <div id="tResult"></div>
   </div>
   <div class="tcard">
@@ -168,12 +168,13 @@ table.board tr.wait td{color:var(--dim)}
     return '<div class="team" style="--tc:' + T.colors.accent + '"><div class="th"><div style="min-width:0"><h3>' + esc(r.key) + '</h3><span class="pg">' + esc(T.title) + ' · ' + esc(T.program) + '</span></div>' + badge + '</div>' +
       nums + opLine + '<div class="ppl">' + ppl + '</div><div class="tfoot">' + btns + '</div></div>';
   }
-  function points(rank) { return rank === 1 ? 100 : rank <= 3 ? 95 : rank <= 6 ? 90 : 80; }
+  function points(rank) { return FIX.points(rank); }
+  function race(ms) { var s = Math.max(0, Math.floor(ms / 1000)), h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60, x = s % 60; return (h ? h + ':' + String(m).padStart(2, '0') : m) + ':' + String(x).padStart(2, '0'); }
   function ordinal(n) { var s = ['th', 'st', 'nd', 'rd'], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); }
   function clock(ms) { var d = new Date(ms); return [d.getHours(), d.getMinutes(), d.getSeconds()].map(function (x) { return String(x).padStart(2, '0'); }).join(':'); }
   function boardRows() {
-    var fin = last.finishers || [], done = {};
-    var rows = fin.map(function (f) { done[f.team] = 1; return { place: ordinal(f.rank), team: f.team, game: TH[f.program].title, at: clock(f.at), pts: points(f.rank), wait: false, players: f.players }; });
+    var fin = (last.finishers || []).slice().sort(function (a, b) { return a.raceMs - b.raceMs; }), done = {};
+    var rows = fin.map(function (f, i) { done[f.team] = 1; return { place: ordinal(i + 1), team: f.team, game: TH[f.program].title, at: race(f.raceMs), pts: points(i + 1), wait: false, players: f.players }; });
     last.rooms.forEach(function (r) {
       if (done[r.key]) return;
       rows.push({ place: '—', team: r.key, game: TH[r.program].title, at: r.state === 'playing' ? 'playing · ' + r.fixed + '/' + r.target : 'not finished', pts: 80, wait: true, players: r.players.map(function (p) { return p.name; }) });
@@ -236,18 +237,28 @@ table.board tr.wait td{color:var(--dim)}
   $('dTabs').addEventListener('click', function (e) { var b = e.target.closest('button[data-p]'); if (!b) return; cur = b.dataset.p; renderDebrief(); });
   renderDebrief();
 
-  // log check
+  // check and rank pasted logs
+  var lastRank = '';
   $('tVerify').addEventListener('click', function () {
-    var s = $('tLog').value, out = $('tResult');
-    function m(re) { var r = s.match(re); return r ? r[1].trim() : null; }
-    var f = { title: m(/^\s*([A-Z][A-Z ]+?)\s*·/m), code: m(/Team:\s*([A-Z0-9]+)/), N: m(/Station\s+\d+\s+of\s+(\d+)/), s: m(/Station\s+(\d+)\s+of/),
-      runNo: m(/Game\s+(\d+)/), fixed: m(/Machines fixed:\s*(\d+)/), attempts: m(/Attempts:\s*(\d+)/), lives: m(/Spare parts left:\s*(\d+)/), status: m(/Status:\s*([a-z0-9 #]+)/) };
-    var code = m(/Check:\s*([A-Z0-9]+)/);
-    if (Object.keys(f).some(function (k) { return f[k] === null; }) || !code) { out.innerHTML = '<div class="verdict bad">This doesn\'t look like a complete log. Ask the student to tap "Copy log" again and paste all of it.</div>'; return; }
-    ['N', 's', 'runNo', 'fixed', 'attempts', 'lives'].forEach(function (k) { f[k] = +f[k]; });
-    var ok = FIX.checkCode(f) === code;
-    out.innerHTML = ok ? '<div class="verdict ok">✓ Genuine. ' + esc(f.title) + ' · team ' + esc(f.code) + ' · ' + f.fixed + ' machines fixed (' + esc(f.status) + ').</div>'
-      : '<div class="verdict bad">✗ The check code doesn\'t match. Something in this log was changed.</div>';
+    var res = FIX.rankLogs($('tLog').value), out = $('tResult');
+    if (!res.checked && !res.problems.length) { out.innerHTML = '<div class="verdict bad">No logs found. Paste the text students copied with "Copy log".</div>'; return; }
+    var rows = res.rows.map(function (t) {
+      return '<tr class="' + (t.finished ? '' : 'wait') + '"><td>' + (t.place ? ordinal(t.place) : '—') + '</td><td><b>' + esc(t.team) + '</b><br><span style="font-size:12px;color:var(--dim)">' + esc(t.players) + '</span></td><td>' + esc(t.title) + '</td><td>' + (t.finished ? race(t.raceSec * 1000) : 'fixed ' + t.fixed) + '</td><td class="pts">' + t.points + '</td></tr>';
+    }).join('');
+    var probs = res.problems.length ? '<div class="verdict bad">' + res.problems.length + ' log' + (res.problems.length > 1 ? 's' : '') + ' rejected: ' +
+      res.problems.map(function (p) { return 'team ' + esc(p.team) + ' (' + (p.why === 'edited' ? 'check code doesn\'t match, changed' : 'incomplete') + ')'; }).join(', ') + '.</div>' : '';
+    out.innerHTML = '<div class="verdict ok">✓ ' + res.checked + ' genuine log' + (res.checked === 1 ? '' : 's') + ' · ' + res.rows.length + ' team' + (res.rows.length === 1 ? '' : 's') + '</div>' + probs +
+      '<div style="overflow-x:auto;margin-top:10px"><table class="board"><thead><tr><th>Place</th><th>Team</th><th>Game</th><th>Race time</th><th>Points</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
+      '<div class="tfoot" style="margin-top:8px"><button class="mini" id="copyRank">Copy ranking</button></div><textarea class="log" id="rankTxt" readonly hidden style="margin-top:8px;min-height:120px"></textarea>';
+    lastRank = 'Fix-It Crew ranking · ' + new Date().toDateString() + '\n' + res.rows.map(function (t) {
+      return (t.place ? ordinal(t.place) : '—') + '\t' + t.team + '\t' + t.title + '\t' + (t.finished ? race(t.raceSec * 1000) : 'not finished (' + t.fixed + ' fixed)') + '\t' + t.points + '\t' + t.players;
+    }).join('\n');
+  });
+  $('tResult').addEventListener('click', function (e) {
+    var b = e.target.closest('#copyRank'); if (!b) return;
+    var box = $('rankTxt');
+    box.value = lastRank; box.hidden = false;
+    try { navigator.clipboard.writeText(lastRank).then(function () { b.textContent = 'Copied ✓'; }, function () { box.focus(); box.select(); b.textContent = 'Selected above — copy it'; }); } catch (err) { box.focus(); box.select(); }
   });
 })();
 </script>
